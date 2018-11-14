@@ -1,0 +1,26 @@
+name:                cokescot
+version:             0.1.0.0
+#synopsis:
+#description:
+homepage:            https://github.com/jorpic/cokescot#readme
+license:             BSD3
+author:              Max Taldykin
+maintainer:          jorpic@gmail.com
+copyright:           2019 Max Taldykin
+category:            Other
+extra-source-files:
+- README.md
+
+dependencies:
+  - base >= 4.7 && < 5
+  - bytestring
+  - text
+  - aeson
+
+default-extensions:
+  - OverloadedStrings
+
+executables:
+  cokescot:
+    source-dirs:      src
+    main:             Main.hs
