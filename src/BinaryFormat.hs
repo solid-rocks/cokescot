@@ -19,14 +19,12 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Internal.Read (hexDigitToInt)
 
-import           Data.Binary
-import           Data.Binary.Get (getByteString, getInt32le)
 import           Data.Binary.Put (putLazyByteString, putInt32le, runPut)
 
 import           System.IO (stderr, IOMode(WriteMode), withBinaryFile)
 
 
-const_ADDRESS_LENGTH = 20
+-- const_ADDRESS_LENGTH = 20 :: Int
 type Address = B.ByteString
 type Code = B.ByteString
 
@@ -43,12 +41,12 @@ data ContractInfo = ContractInfo
 jsonToBinary :: FilePath -> IO ()
 jsonToBinary out = withBinaryFile out WriteMode $ \h -> do
   let parser jsn = (,) <$> jsn .: "address" <*> jsn .: "bytecode"
-  let parseLine :: L8.ByteString -> Maybe (Text, Text)
-      parseLine l = Aeson.decode l >>= Aeson.parseMaybe parser
+  let parseRow :: L8.ByteString -> Maybe (Text, Text)
+      parseRow r = Aeson.decode r >>= Aeson.parseMaybe parser
 
-  lines <- L8.lines <$> L8.getContents
-  forM_ lines $ \l -> case parseLine l of
-    Nothing -> L8.hPutStr stderr l
+  rows <- L8.lines <$> L8.getContents
+  forM_ rows $ \r -> case parseRow r of
+    Nothing -> L8.hPutStr stderr r
     Just (addrHex, codeHex) -> do
       let addr' = hexToLBS addrHex
       let code' = hexToLBS codeHex
@@ -66,8 +64,8 @@ hexToLBS hex
   = B.toLazyByteString
   $ mconcat $ map readByte
   $ case T.length hex' `mod` 2 of
-    0 -> T.chunksOf 2 hex'
     1 -> T.snoc "0" (T.head hex') : T.chunksOf 2 (T.tail hex')
+    _ -> T.chunksOf 2 hex'
   where
     hex' = fromMaybe hex
       $   T.stripPrefix "0x" hex

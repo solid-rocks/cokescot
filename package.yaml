@@ -23,6 +23,9 @@ default-extensions:
   - OverloadedStrings
   - RecordWildCards
 
+ghc-options:
+  - -Wall
+
 executables:
   cokescot:
     source-dirs:      src
