@@ -14,11 +14,14 @@ extra-source-files:
 dependencies:
   - base >= 4.7 && < 5
   - bytestring
+  - binary
   - text
   - aeson
+  - optparse-applicative
 
 default-extensions:
   - OverloadedStrings
+  - RecordWildCards
 
 executables:
   cokescot:

@@ -1,25 +1,27 @@
 module Main where
 
-import           Control.Monad (forM_, mapM_)
-import           Data.Aeson ((.:))
-import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.Types as Aeson
-import qualified Data.ByteString.Lazy.Char8 as L
-import           Data.Text (Text)
-
-import           System.IO (stderr)
+import           Control.Applicative
+import           Control.Monad (join)
+import           Options.Applicative
+import           BinaryFormat (jsonToBinary)
 
 
-parseLine :: L.ByteString -> Maybe (Text, Text)
-parseLine l = Aeson.decode l >>= Aeson.parseMaybe parser
-  where
-    parser jsn = (,) <$> jsn .: "address" <*> jsn .: "bytecode"
+commands :: Parser (IO ())
+commands = subparser
+  $ let commandArgs = strOption
+          $  long "output" <> short 'o'
+          <> metavar "FILE"
+          <> help "Write binary output to FILE"
+    in command "json-to-binary"
+      $ info (jsonToBinary <$> commandArgs)
+      $ progDesc
+        "Convert BigQuery's dump into a compact binary representation."
 
 
 main :: IO ()
-main = do
-  lines <- L.lines <$> L.getContents
-  forM_ lines $ \l -> case parseLine l of
-    Nothing -> do
-      mapM_ (L.hPutStr stderr) ["Error in line: ", l, "\n"]
-    Just (addr, code) -> return ()
+main = join
+  $ customExecParser (prefs showHelpOnEmpty)
+  $ info (commands <**> helper)
+  $ fullDesc <> progDesc
+    "Set of tools to analyse all the contracts\
+    \ on the Ethereum blockchain."
