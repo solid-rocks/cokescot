@@ -19,12 +19,17 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Internal.Read (hexDigitToInt)
 
-import           Data.Binary.Put (putLazyByteString, putInt32le, runPut)
+import           Data.Binary
+import           Data.Binary.Get (getByteString, getInt32le)
+import           Data.Binary.Put
+  (putLazyByteString, putByteString, putInt32le, runPut)
 
 import           System.IO (stderr, IOMode(WriteMode), withBinaryFile)
 
 
--- const_ADDRESS_LENGTH = 20 :: Int
+const_ADDRESS_LENGTH :: Int
+const_ADDRESS_LENGTH = 20
+
 type Address = B.ByteString
 type Code = B.ByteString
 
@@ -33,6 +38,35 @@ data ContractInfo = ContractInfo
   { addr :: !Address
   , code :: !Code
   }
+
+instance Show ContractInfo where
+  show ContractInfo{..} = show $ B.toLazyByteString
+    $ B.byteStringHex addr <> B.char8 ' ' <> B.byteStringHex code
+
+
+
+instance Binary ContractInfo where
+  get = do
+    addr' <- getByteString const_ADDRESS_LENGTH
+    len   <- getInt32le
+    code' <- getByteString $ fromIntegral len
+    return $ ContractInfo addr' code'
+
+  -- This is not used
+  put ContractInfo{..} = do
+    putByteString addr
+    putInt32le $ fromIntegral $ B.length code
+    putByteString code
+
+
+readBinary :: FilePath -> IO [ContractInfo]
+readBinary f = loop <$> L.readFile f
+  where
+    loop bytes = case decodeOrFail bytes of
+      -- FIXME: check error and throw if not EOF
+      Left (_rest, _consumed, err) -> []
+      Right (rest, consumed, res) -> res : loop rest
+
 
 
 -- FIXME: handle file open/write errors
@@ -51,7 +85,7 @@ jsonToBinary out = withBinaryFile out WriteMode $ \h -> do
       let addr' = hexToLBS addrHex
       let code' = hexToLBS codeHex
       -- I tried to reduce number of hPut's by collecting
-      -- bunch of strings and writing them all at once
+      -- bunch of bytestrings and writing them all at once
       -- but this does not influence performance at all.
       L.hPut h $ runPut $ do
         putLazyByteString addr'
