@@ -1,9 +1,13 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module BinaryFormat where
+module ContractInfo
+  ( ContractInfo(..)
+  , fromJSON, fromBinary, toBinary
+  ) where
 
 import           Control.Applicative ((<|>))
 import           Control.Monad
+import           Control.Exception
 import           Data.Maybe (fromMaybe)
 
 import           Data.Aeson ((.:))
@@ -21,10 +25,9 @@ import           Data.Text.Internal.Read (hexDigitToInt)
 
 import           Data.Binary
 import           Data.Binary.Get (getByteString, getInt32le)
-import           Data.Binary.Put
-  (putLazyByteString, putByteString, putInt32le, runPut)
+import           Data.Binary.Put (putByteString, putInt32le, runPut)
 
-import           System.IO (stderr, IOMode(WriteMode), withBinaryFile)
+import           System.IO (IOMode(WriteMode), withBinaryFile, Handle)
 
 
 const_ADDRESS_LENGTH :: Int
@@ -39,10 +42,10 @@ data ContractInfo = ContractInfo
   , code :: !Code
   }
 
+
 instance Show ContractInfo where
   show ContractInfo{..} = show $ B.toLazyByteString
     $ B.byteStringHex addr <> B.char8 ' ' <> B.byteStringHex code
-
 
 
 instance Binary ContractInfo where
@@ -52,50 +55,48 @@ instance Binary ContractInfo where
     code' <- getByteString $ fromIntegral len
     return $ ContractInfo addr' code'
 
-  -- This is not used
   put ContractInfo{..} = do
     putByteString addr
     putInt32le $ fromIntegral $ B.length code
     putByteString code
 
 
-readBinary :: FilePath -> IO [ContractInfo]
-readBinary f = loop <$> L.readFile f
+data ParseError = ParseError L.ByteString String deriving Show
+instance Exception ParseError
+
+
+fromBinary :: FilePath -> IO [ContractInfo]
+fromBinary f = loop <$> L.readFile f
   where
     loop bytes = case decodeOrFail bytes of
-      -- FIXME: check error and throw if not EOF
-      Left (_rest, _consumed, err) -> []
-      Right (rest, consumed, res) -> res : loop rest
+      Left ("", _consumed, _err) -> []
+      Left (rest, _consumed, err) -> throw $ ParseError (L.take 200 rest) err
+      Right (rest, _consumed, res) -> res : loop rest
 
 
+fromJSON :: Handle -> IO [ContractInfo]
+fromJSON h = do
+  let parser jsn = do
+        addr' <- hexToBS <$> jsn .: "address"
+        code' <- hexToBS <$> jsn .: "bytecode"
+        when (B.length addr' /= const_ADDRESS_LENGTH)
+          $ fail "invalid address length"
+        return $ ContractInfo addr' code'
+  let parseRow r = Aeson.eitherDecode r >>= Aeson.parseEither parser
 
--- FIXME: handle file open/write errors
--- FIXME: handle format errors
--- FIXME: check addr length
-jsonToBinary :: FilePath -> IO ()
-jsonToBinary out = withBinaryFile out WriteMode $ \h -> do
-  let parser jsn = (,) <$> jsn .: "address" <*> jsn .: "bytecode"
-  let parseRow :: L8.ByteString -> Maybe (Text, Text)
-      parseRow r = Aeson.decode r >>= Aeson.parseMaybe parser
-
-  rows <- L8.lines <$> L8.getContents
-  forM_ rows $ \r -> case parseRow r of
-    Nothing -> L8.hPutStr stderr r
-    Just (addrHex, codeHex) -> do
-      let addr' = hexToLBS addrHex
-      let code' = hexToLBS codeHex
-      -- I tried to reduce number of hPut's by collecting
-      -- bunch of bytestrings and writing them all at once
-      -- but this does not influence performance at all.
-      L.hPut h $ runPut $ do
-        putLazyByteString addr'
-        putInt32le $ fromIntegral $ L.length code'
-        putLazyByteString code'
+  map (\r -> either (throw . ParseError r) id $ parseRow r)
+    . L8.lines
+    <$> L8.hGetContents h
 
 
-hexToLBS :: Text -> L.ByteString
-hexToLBS hex
-  = B.toLazyByteString
+toBinary :: FilePath -> [ContractInfo] -> IO ()
+toBinary file ci = withBinaryFile file WriteMode
+  $ \h -> forM_ ci $ L.hPut h . runPut . put
+
+
+hexToBS :: Text -> B.ByteString
+hexToBS hex
+  = L.toStrict $ B.toLazyByteString
   $ mconcat $ map readByte
   $ case T.length hex' `mod` 2 of
     1 -> T.snoc "0" (T.head hex') : T.chunksOf 2 (T.tail hex')

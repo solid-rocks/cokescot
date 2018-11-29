@@ -3,22 +3,24 @@ module Main where
 import           Control.Applicative
 import           Control.Monad
 import           Options.Applicative
-import           BinaryFormat (jsonToBinary, readBinary)
+import           System.IO (stdin)
+import qualified ContractInfo as CI
 
 
 commands :: Parser (IO ())
 commands = subparser
   $ (let commandArgs = argument str
           (metavar "FILE" <> help "Write binary output to FILE")
+         cmd f = CI.fromJSON stdin >>= CI.toBinary f
     in command "json-to-binary"
-      $ info (jsonToBinary <$> commandArgs)
+      $ info (cmd <$> commandArgs)
       $ progDesc
         "Convert BigQuery's dump into a compact binary representation.")
   <>
     (let commandArgs = argument str
           (metavar "FILE" <> help "Read binary format from FILE")
     in command "read-binary"
-      $ info ((readBinary >=> mapM_ print) <$> commandArgs)
+      $ info ((CI.fromBinary >=> mapM_ print) <$> commandArgs)
       $ progDesc
         "Run this command to test binary format reader.")
 
