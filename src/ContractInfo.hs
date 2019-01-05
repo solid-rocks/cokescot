@@ -57,8 +57,8 @@ hexToVec hex
       (len, '0':'X':xs) -> (len - 2, xs)
       res -> res
     loop (a:b:xs)
-      = let x = (hexDigit a) * 16 + hexDigit b
-        in fromIntegral x : loop xs
+      = let !x = fromIntegral $ (hexDigit a) * 16 + hexDigit b
+        in x : loop xs
     loop _ = []
 
 

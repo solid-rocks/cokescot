@@ -18,6 +18,7 @@ dependencies:
   - vector
 
 default-extensions:
+  - BangPatterns
   - OverloadedStrings
   - RecordWildCards
   - LambdaCase
