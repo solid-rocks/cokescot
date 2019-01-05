@@ -49,7 +49,7 @@ hexToBS hex
   = L.toStrict $ B.toLazyByteString $ mconcat $ map (B.word8 . fromIntegral)
   $ loop hex'
   where
-    evenify xs = if even $ length xs then xs else '0':xs
+    evenify xs = if even $ L.length hex then xs else '0':xs
     hex' = evenify $ case L8.unpack hex of
       '0':'x':xs -> xs
       '0':'X':xs -> xs
