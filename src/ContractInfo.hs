@@ -5,16 +5,22 @@ module ContractInfo
   , Code
   , Address
   , fromText
+  , toReverseBinary
+  , fromReverseBinary
   ) where
 
+import           Control.Monad (forM_)
 import           Data.Char (ord)
 import           Data.Word (Word8)
+import qualified Data.Map.Strict as Map
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Lazy.Char8 as L8
+import qualified Data.ByteString.Lazy as L
 import qualified Data.Vector.Unboxed as U
-
-import           System.IO (Handle)
+import           Data.Binary.Put
+import           Data.Binary.Get
+import           System.IO (withBinaryFile, IOMode(..), Handle)
 
 
 const_ADDRESS_LENGTH :: Int
@@ -47,6 +53,35 @@ fromText h = do
         [addr] -> ContractInfo (hexToVec addr) U.empty
         line -> error $ show line
   map (parse . L8.words) . L8.lines <$> L8.hGetContents h
+
+
+toReverseBinary :: FilePath -> Map.Map Code [Address] -> IO ()
+toReverseBinary name cm = withBinaryFile name WriteMode $ \h -> do
+  forM_ (Map.toList cm) $ \(code, addrs)  -> do
+    L.hPut h $ runPut $ do
+      putInt32le $ fromIntegral $ length addrs
+      forM_ addrs (sequence . map putWord8 . U.toList)
+      putInt32le $ fromIntegral $ U.length code
+      mapM_ putWord8 $ U.toList code
+
+
+fromReverseBinary :: FilePath -> IO [(Code, [Address])]
+fromReverseBinary = fmap loop . L.readFile
+  where
+    getEntry = do
+      addrCount <- fromIntegral <$> getInt32le
+      addrs <- sequence $ replicate addrCount
+        $ U.fromListN (fromIntegral const_ADDRESS_LENGTH)
+          <$> sequence (replicate const_ADDRESS_LENGTH getWord8)
+      codeLen <- fromIntegral <$> getInt32le
+      code <- U.fromListN codeLen <$> sequence (replicate codeLen getWord8)
+      return (code, addrs)
+
+    loop str
+      | L.null str = []
+      | otherwise = case runGetOrFail getEntry str of
+        Left err -> error $ show err
+        Right (rest, _, res) -> res : loop rest
 
 
 -- TODO: read Word16 from LBS, search it in precompiled IntMap

@@ -14,13 +14,13 @@ extra-source-files:
 dependencies:
   - base >= 4.7 && < 5
   - bytestring
+  - binary
   - containers
   - optparse-applicative
   - vector
 
 default-extensions:
   - BangPatterns
-  - OverloadedStrings
   - RecordWildCards
   - LambdaCase
 

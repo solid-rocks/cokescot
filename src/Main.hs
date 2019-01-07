@@ -5,6 +5,8 @@ import           System.IO (stdin)
 import qualified ContractInfo as CI
 import qualified Analysis as A
 
+import qualified Data.Map.Strict as Map
+
 
 data Options = Options
 
@@ -20,4 +22,9 @@ main = do
         \ on the Ethereum blockchain."
 
   ci <- CI.fromText stdin
-  A.printStats ci
+  let cm = A.contractMap ci
+  CI.toReverseBinary "contracts.bin" cm
+  cx <- Map.fromList <$> CI.fromReverseBinary "contracts.bin"
+  print $ cm == cx
+  A.printStats cm
+  A.printStats cx
