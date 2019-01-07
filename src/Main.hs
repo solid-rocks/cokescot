@@ -3,6 +3,7 @@ module Main where
 import           Options.Applicative
 import           System.IO (stdin)
 import qualified ContractInfo as CI
+import qualified Analysis as A
 
 
 data Options = Options
@@ -18,4 +19,5 @@ main = do
         "Set of tools to analyse all the contracts\
         \ on the Ethereum blockchain."
 
-  CI.fromText stdin >>= mapM_ print
+  ci <- CI.fromText stdin
+  A.printStats ci

@@ -2,6 +2,8 @@
 
 module ContractInfo
   ( ContractInfo(..)
+  , Code
+  , Address
   , fromText
   ) where
 
@@ -47,6 +49,7 @@ fromText h = do
   map (parse . L8.words) . L8.lines <$> L8.hGetContents h
 
 
+-- TODO: read Word16 from LBS, search it in precompiled IntMap
 hexToVec :: L8.ByteString -> U.Vector Word8
 hexToVec hex
   = U.fromListN (fromIntegral $ len' `div` 2) $ loop hex'
@@ -60,7 +63,6 @@ hexToVec hex
       = let !x = fromIntegral $ (hexDigit a) * 16 + hexDigit b
         in x : loop xs
     loop _ = []
-
 
 hexDigit :: Char -> Int
 hexDigit c
